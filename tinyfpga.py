@@ -7,11 +7,12 @@ from collections import OrderedDict
 from litex.build.generic_platform import *
 from litex.build.lattice import LatticePlatform
 
+from litex.build.lattice.programmer import TinyFpgaBProgrammer
+
 from litex.gen import *
 from litex.soc.interconnect.csr import *
 
 from litex.soc.cores.uart import UARTWishboneBridge
-from litex.soc.cores.timer import Timer
 
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
@@ -40,11 +41,6 @@ class Platform(LatticePlatform):
         return TinyFpgaBProgrammer()
 
 
-def csr_map_update(csr_map, csr_peripherals):
-    csr_map.update(OrderedDict((n, v)
-        for v, n in enumerate(csr_peripherals, start=max(csr_map.values()) + 1)))
-
-
 def get_firmware_data(filename, size):
     try:
         data = []
@@ -64,61 +60,49 @@ def get_firmware_data(filename, size):
         return []
 
 
-class TinyFPGA(SoCCore):
-    csr_peripherals = [
-        "flash",
-        "analyzer"
-    ]
-    csr_map_update(SoCCore.csr_map, csr_peripherals)
-
-    def __init__(self, with_cpu=False, with_analyzer=False):
+class TinyFPGAB(SoCCore):
+    def __init__(self, with_cpu=True):
         platform = Platform()
         sys_clk_freq = int(16e6)
 
         integrated_rom_size = 0
         integrated_rom_init = []
         if with_cpu:
-            integrated_rom_size = 0x6000
-            integrated_rom_init = get_firmware_data("./firmware/firmware.bin", 0x6000)
+            integrated_rom_size = 0x2000
+            integrated_rom_init = get_firmware_data("./firmware/firmware.bin", 0x2000)
 
         SoCCore.__init__(self, platform,
             clk_freq=sys_clk_freq,
             cpu_type="lm32" if with_cpu else None,
-            csr_data_width=32, csr_address_width=15,
-            with_uart=with_cpu, uart_stub=with_analyzer,
+            csr_data_width=8,
+            with_uart=with_cpu,
             with_timer=with_cpu,
             ident="TinyFPGA Test SoC",
             ident_version=True,
             integrated_rom_size=integrated_rom_size,
-            integrated_rom_init=integrated_rom_init,
-            integrated_main_ram_size=0)
+            integrated_rom_init=integrated_rom_init)
 
         # bridge
-        if with_cpu:
-            self.add_constant("ROM_BOOT_ADDRESS", self.mem_map["main_ram"])
-        else:
+        if not with_cpu:
             self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), sys_clk_freq, baudrate=115200))
             self.add_wb_master(self.cpu_or_bridge.wishbone)
 
-        # analyzer
-        if with_analyzer:
-            analyzer_signals = [
-                Signal(),
-                Signal()
-            ]
-            self.submodules.analyzer = LiteScopeAnalyzer(analyzer_signals, 512)
-
-    def do_exit(self, vns):
-        if hasattr(self, "analyzer"):
-            self.analyzer.export_csv(vns, "test/analyzer.csv")
-
 
 def main():
-    print("[building]...")
-    soc = TinyFPGA()
-    builder = Builder(soc, csr_csv="test/csr.csv")
-    vns = builder.build()
-    soc.do_exit(vns)
+    args = sys.argv[1:]
+    flash = "flash" in args
+    build = (not "flash" in args)
+
+    if build:
+        print("[building]...")
+        soc = TinyFPGAB()
+        builder = Builder(soc, output_dir="build", csr_csv="test/csr.csv")
+        vns = builder.build()
+        soc.do_exit(vns)
+    else:
+        print("[flashing]...")
+        prog = TinyFpgaBProgrammer()
+        prog.flash(0x30000, "build/gateware/top.bin")
 
 
 if __name__ == "__main__":
