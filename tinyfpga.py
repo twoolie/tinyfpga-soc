@@ -23,10 +23,11 @@ from litescope import LiteScopeAnalyzer
 _io = [
     ("clk16", 0, Pins("B4"), IOStandard("LVCMOS33")),
     ("serial", 0,
-        Subsignal("tx", Pins("B2")),
+        Subsignal("tx", Pins("A1")),
         Subsignal("rx", Pins("A2")),
         IOStandard("LVCMOS33")
     ),
+
 ]
 
 
@@ -75,7 +76,7 @@ class TinyFPGAB(SoCCore):
             clk_freq=sys_clk_freq,
             cpu_type="lm32" if with_cpu else None,
             csr_data_width=8,
-            with_uart=with_cpu,
+            with_uart=with_cpu, uart_baudrate=9600,
             with_timer=with_cpu,
             ident="TinyFPGA Test SoC",
             ident_version=True,
@@ -103,7 +104,6 @@ def main():
         print("[flashing]...")
         prog = TinyFpgaBProgrammer()
         prog.flash(0x30000, "build/gateware/top.bin")
-
 
 if __name__ == "__main__":
     main()
