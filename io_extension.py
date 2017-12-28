@@ -37,7 +37,7 @@ serial_pads = plat.request("serial")
 io_serial_pads = plat.request("io_serial")
 module.comb += [
     serial_pads.tx.eq(io_serial_pads.rx),
-    io_serial_pads.rx.eq(serial_pads.rx),
+    io_serial_pads.tx.eq(serial_pads.rx),
     plat.request("user_led", 0).eq(plat.request("io_leds", 0)),
     plat.request("user_led", 1).eq(plat.request("io_leds", 1)),
     plat.request("user_led", 2).eq(plat.request("io_leds", 2)),
