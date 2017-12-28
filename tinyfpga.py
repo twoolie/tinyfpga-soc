@@ -27,7 +27,6 @@ _io = [
         Subsignal("rx", Pins("A2")),
         IOStandard("LVCMOS33")
     ),
-
 ]
 
 
