@@ -90,7 +90,7 @@ class TinyFPGAB(SoCCore):
             clk_freq=sys_clk_freq,
             cpu_type="lm32" if with_cpu else None,
             csr_data_width=8,
-            with_uart=with_cpu, uart_baudrate=9600,
+            with_uart=with_cpu,
             with_timer=with_cpu,
             ident="TinyFPGA Test SoC",
             ident_version=True,
