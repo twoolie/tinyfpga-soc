@@ -27,13 +27,14 @@ _io = [
         Subsignal("rx", Pins("A2")),
         IOStandard("LVCMOS33")
     ),
+    ("user_led", 0, Pins("B1"), IOStandard("LVCMOS33")),
+    ("user_led", 1, Pins("C1"), IOStandard("LVCMOS33")),
+    ("user_led", 2, Pins("D1"), IOStandard("LVCMOS33")),
+    ("user_led", 3, Pins("E1"), IOStandard("LVCMOS33")),
 ]
 
 
 class Platform(LatticePlatform):
-    default_clk_name = "clk16"
-    default_clk_period = 62.5
-
     def __init__(self):
         LatticePlatform.__init__(self, "ice40-lp8k-cm81", _io, toolchain="icestorm")
 
@@ -60,10 +61,24 @@ def get_firmware_data(filename, size):
         return []
 
 
+class _CRG(Module):
+    def __init__(self, platform):
+        self.clock_domains.cd_sys = ClockDomain()
+        clk16 = platform.request("clk16")
+        pll_sys_clk = Signal()
+        self.specials += Instance("SB_PLL40_CORE",
+            i_REFERENCECLK=clk16,
+            o_PLLOUTCORE=pll_sys_clk,
+            i_RESETB=1,
+            i_BYPASS=0
+        )
+        self.comb += self.cd_sys.clk.eq(pll_sys_clk)
+
+
 class TinyFPGAB(SoCCore):
     def __init__(self, with_cpu=True):
         platform = Platform()
-        sys_clk_freq = int(16e6)
+        sys_clk_freq = int(48e6)
 
         integrated_rom_size = 0
         integrated_rom_init = []
@@ -82,10 +97,22 @@ class TinyFPGAB(SoCCore):
             integrated_rom_size=integrated_rom_size,
             integrated_rom_init=integrated_rom_init)
 
+        self.submodules.crg = _CRG(platform)
+
         # bridge
         if not with_cpu:
             self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), sys_clk_freq, baudrate=115200))
             self.add_wb_master(self.cpu_or_bridge.wishbone)
+
+
+        led_counter = Signal(32)
+        self.sync += led_counter.eq(led_counter + 1)
+        self.comb += [
+            platform.request("user_led", 0).eq(led_counter[22]),
+            platform.request("user_led", 1).eq(led_counter[23]),
+            platform.request("user_led", 2).eq(led_counter[24]),
+            platform.request("user_led", 3).eq(led_counter[25])
+        ]
 
 
 def main():
