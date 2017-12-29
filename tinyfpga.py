@@ -23,12 +23,9 @@ from litescope import LiteScopeAnalyzer
 
 _io = [
     ("clk16", 0, Pins("B4"), IOStandard("LVCMOS33")),
+    ("rst", 0, Pins("E1"), IOStandard("LVCMOS33")),
+
     ("serial", 0,
-        Subsignal("tx", Pins("H1")),
-        Subsignal("rx", Pins("J1")),
-        IOStandard("LVCMOS33")
-    ),
-    ("serial_real", 0,
         Subsignal("tx", Pins("A1")),
         Subsignal("rx", Pins("A2")),
         IOStandard("LVCMOS33")
@@ -36,7 +33,6 @@ _io = [
     ("user_led", 0, Pins("B1"), IOStandard("LVCMOS33")),
     ("user_led", 1, Pins("C1"), IOStandard("LVCMOS33")),
     ("user_led", 2, Pins("D1"), IOStandard("LVCMOS33")),
-    ("user_led", 3, Pins("E1"), IOStandard("LVCMOS33")),
 ]
 
 
@@ -69,11 +65,26 @@ def get_firmware_data(filename, size):
 
 class _CRG(Module):
     def __init__(self, platform):
+        clk16 = platform.request("clk16")
+        rst = platform.request("rst")
+        self.clock_domains.cd_por = ClockDomain(reset_less=True)
         self.clock_domains.cd_sys = ClockDomain()
-        self.comb += self.cd_sys.clk.eq(platform.request("clk16"))
+        reset_delay = Signal(12, reset=4095)
+        self.comb += [
+            self.cd_por.clk.eq(clk16),
+            self.cd_sys.clk.eq(clk16),
+            self.cd_sys.rst.eq(reset_delay != 0)
+        ]
+        self.sync.por += \
+            If(rst,
+                reset_delay.eq(0)
+            ).Elif(reset_delay != 0,
+                reset_delay.eq(reset_delay - 1)
+            )
+
 
 class TinyFPGAB(SoCCore):
-    def __init__(self, with_cpu=False):
+    def __init__(self, with_cpu=True):
         platform = Platform()
         sys_clk_freq = int(16e6)
 
@@ -101,40 +112,14 @@ class TinyFPGAB(SoCCore):
             self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), sys_clk_freq, baudrate=9600))
             self.add_wb_master(self.cpu_or_bridge.wishbone)
 
-
         led_counter = Signal(32)
         self.sync += led_counter.eq(led_counter + 1)
         self.comb += [
             platform.request("user_led", 0).eq(led_counter[22]),
             platform.request("user_led", 1).eq(led_counter[23]),
-            platform.request("user_led", 2).eq(led_counter[24]),
-            platform.request("user_led", 3).eq(led_counter[25])
+            platform.request("user_led", 2).eq(led_counter[24])
         ]
 
-        from litex.soc.cores.uart import RS232PHY
-        serial_pads = platform.request("serial_real")
-        rs232phy = RS232PHY(serial_pads, sys_clk_freq, baudrate=9600)
-        self.submodules += rs232phy
-        rs232fifo = stream.SyncFIFO([("data", 8)], 64)
-        self.submodules += rs232fifo
-        self.comb += [
-            rs232phy.source.connect(rs232fifo.sink),
-            rs232fifo.source.connect(rs232phy.sink)
-        ]
-
-
-        #send = Signal()
-        #send_d = Signal()
-        #self.comb += send.eq(led_counter[19])
-        #self.sync += send_d.eq(send)
-        
-        #self.sync += [
-        #    rs232phy.sink.valid.eq(0),
-        #    If(send & ~send_d,
-        #        rs232phy.sink.valid.eq(1),
-        #        rs232phy.sink.data.eq(rs232phy.sink.data + 1)
-        #    )
-        #]
 
 def main():
     args = sys.argv[1:]

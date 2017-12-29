@@ -27,7 +27,7 @@ _extension_io = [
     ("io_leds", 0, Pins("A11"), IOStandard("LVCMOS33")),
     ("io_leds", 1, Pins("D12"), IOStandard("LVCMOS33")),
     ("io_leds", 2, Pins("D13"), IOStandard("LVCMOS33")),
-    ("io_leds", 3, Pins("B18"), IOStandard("LVCMOS33")),
+    ("io_rst",  0, Pins("B18"), IOStandard("LVCMOS33")),
 ]
 
 
@@ -51,7 +51,7 @@ def main():
             plat.request("user_led", 0).eq(plat.request("io_leds", 0)),
             plat.request("user_led", 1).eq(plat.request("io_leds", 1)),
             plat.request("user_led", 2).eq(plat.request("io_leds", 2)),
-            plat.request("user_led", 3).eq(plat.request("io_leds", 3)),
+            plat.request("io_rst", 0).eq(plat.request("user_btn", 0)),
         ]
         plat.build(module, source=False)
     elif load:
