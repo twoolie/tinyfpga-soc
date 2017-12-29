@@ -10,6 +10,7 @@ from litex.build.lattice import LatticePlatform
 from litex.build.lattice.programmer import TinyFpgaBProgrammer
 
 from litex.gen import *
+from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
 from litex.soc.cores.uart import UARTWishboneBridge
@@ -67,41 +68,14 @@ def get_firmware_data(filename, size):
 
 
 class _CRG(Module):
-    def __init__(self, platform, clk_freq=16e6):
-        assert clk_freq in [16e6, 48e6]
+    def __init__(self, platform):
         self.clock_domains.cd_sys = ClockDomain()
-        clk16 = platform.request("clk16")
-
-        if clk_freq == 16e6:
-            self.comb += self.cd_sys.clk.eq(clk16)
-        elif clk_freq == 48e6:
-            pll_clk = Signal()
-            self.specials += Instance("SB_PLL40_CORE",
-                p_DIVR=0b0000,
-                p_DIVF=0b0101111,
-                p_DIVQ=0b100,
-                p_FILTER_RANGE=0b001,
-                p_FEEDBACK_PATH="SIMPLE",
-                p_DELAY_ADJUSTMENT_MODE_FEEDBACK="FIXED",
-                p_FDA_FEEDBACK=0b0000,
-                p_DELAY_ADJUSTMENT_MODE_RELATIVE="FIXED",
-                p_FDA_RELATIVE=0b0000,
-                p_SHIFTREG_DIV_MODE=0b00,
-                p_PLLOUT_SELECT="GENCLK",
-                p_ENABLE_ICEGATE=0b0,
-
-                i_REFERENCECLK=clk16,
-                o_PLLOUTCORE=pll_clk,
-                i_RESETB=1,
-                i_BYPASS=0
-            )
-            self.comb += self.cd_sys.clk.eq(pll_clk)
-
+        self.comb += self.cd_sys.clk.eq(platform.request("clk16"))
 
 class TinyFPGAB(SoCCore):
     def __init__(self, with_cpu=False):
         platform = Platform()
-        sys_clk_freq = int(48e6)
+        sys_clk_freq = int(16e6)
 
         integrated_rom_size = 0
         integrated_rom_init = []
@@ -113,7 +87,7 @@ class TinyFPGAB(SoCCore):
             clk_freq=sys_clk_freq,
             cpu_type="lm32" if with_cpu else None,
             csr_data_width=8,
-            with_uart=with_cpu,
+            with_uart=with_cpu, uart_baudrate=9600,
             with_timer=with_cpu,
             ident="TinyFPGA Test SoC",
             ident_version=True,
@@ -124,7 +98,7 @@ class TinyFPGAB(SoCCore):
 
         # bridge
         if not with_cpu:
-            self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), sys_clk_freq, baudrate=115200))
+            self.add_cpu_or_bridge(UARTWishboneBridge(platform.request("serial"), sys_clk_freq, baudrate=9600))
             self.add_wb_master(self.cpu_or_bridge.wishbone)
 
 
@@ -139,21 +113,28 @@ class TinyFPGAB(SoCCore):
 
         from litex.soc.cores.uart import RS232PHY
         serial_pads = platform.request("serial_real")
-        rs232phy = RS232PHY(serial_pads, sys_clk_freq, baudrate=115200)
+        rs232phy = RS232PHY(serial_pads, sys_clk_freq, baudrate=9600)
         self.submodules += rs232phy
-
-        send = Signal()
-        send_d = Signal()
-        self.comb += send.eq(led_counter[19])
-        self.sync += send_d.eq(send)
-        
-        self.sync += [
-            rs232phy.sink.valid.eq(0),
-            If(send & ~send_d,
-                rs232phy.sink.valid.eq(1),
-                rs232phy.sink.data.eq(rs232phy.sink.data + 1)
-            )
+        rs232fifo = stream.SyncFIFO([("data", 8)], 64)
+        self.submodules += rs232fifo
+        self.comb += [
+            rs232phy.source.connect(rs232fifo.sink),
+            rs232fifo.source.connect(rs232phy.sink)
         ]
+
+
+        #send = Signal()
+        #send_d = Signal()
+        #self.comb += send.eq(led_counter[19])
+        #self.sync += send_d.eq(send)
+        
+        #self.sync += [
+        #    rs232phy.sink.valid.eq(0),
+        #    If(send & ~send_d,
+        #        rs232phy.sink.valid.eq(1),
+        #        rs232phy.sink.data.eq(rs232phy.sink.data + 1)
+        #    )
+        #]
 
 def main():
     args = sys.argv[1:]
