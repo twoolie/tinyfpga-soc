@@ -13,7 +13,7 @@
 
 import sys
 
-from litex.gen import *
+from migen import *
 from litex.build.xilinx import VivadoProgrammer
 from litex.build.generic_platform import *
 from litex.boards.platforms import arty

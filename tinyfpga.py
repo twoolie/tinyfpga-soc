@@ -9,7 +9,7 @@ from litex.build.lattice import LatticePlatform
 
 from litex.build.lattice.programmer import TinyFpgaBProgrammer
 
-from litex.gen import *
+from migen import *
 from litex.soc.interconnect import stream
 from litex.soc.interconnect.csr import *
 
