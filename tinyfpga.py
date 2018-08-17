@@ -96,7 +96,7 @@ class TinyFPGAB(SoCCore):
 
         SoCCore.__init__(self, platform,
             clk_freq=sys_clk_freq,
-            cpu_type="lm32" if with_cpu else None,
+            cpu_type="lm32" if with_cpu else None, cpu_variant="minimal",
             csr_data_width=8,
             with_uart=with_cpu, uart_baudrate=9600,
             with_timer=with_cpu,
