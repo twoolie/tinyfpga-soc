@@ -60,7 +60,7 @@ def get_firmware_data(filename, size):
                 data_size, size))
         return data
     except:
-        return []
+        return [0]
 
 
 class _CRG(Module):
@@ -121,6 +121,14 @@ class TinyFPGAB(SoCCore):
         ]
 
 
+def generate_design(**kwargs):
+    soc = TinyFPGAB()
+    builder = Builder(soc, output_dir="build", csr_csv="test/csr.csv", **kwargs)
+    builder.build()
+
+def generate_firmware():
+    os.system("cd firmware && make clean all")
+
 def main():
     args = sys.argv[1:]
     flash = "flash" in args
@@ -128,10 +136,9 @@ def main():
 
     if build:
         print("[building]...")
-        soc = TinyFPGAB()
-        builder = Builder(soc, output_dir="build", csr_csv="test/csr.csv")
-        vns = builder.build()
-        soc.do_exit(vns)
+        generate_design(compile_gateware=False) # generate software headers
+        generate_firmware()                     # compile firmware
+        generate_design()                       # generate design with embedded firmware
     else:
         print("[flashing]...")
         prog = TinyFpgaBProgrammer()
