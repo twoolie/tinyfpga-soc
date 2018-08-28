@@ -1,0 +1,17 @@
+name: tinyfpga-soc
+channels:
+ - timvideos
+dependencies:
+ - python=3.6
+ - pip
+ - yosys
+ - arachne-pnr
+ - tinyprog
+ - binutils-lm32-elf
+ - gcc-lm32-elf-nostdc
+ - pip:
+   - git+https://github.com/m-labs/migen.git#egg=migen
+   - -e .
+   - git+https://github.com/enjoy-digital/liteeth.git#egg=liteeth
+   - git+https://github.com/enjoy-digital/litescope.git#egg=litescope
+   - git+https://github.com/enjoy-digital/litedram.git#egg=litedram
